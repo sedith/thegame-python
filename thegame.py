@@ -41,18 +41,24 @@ class TheGame:
 		print(self.hand)
 
 	def score(self):
+		score = len(self.deck) + len(self.hand)
 		print('----------------------------------')
-		print('Score :', (len(self.deck) + len(self.hand)))
+		print('Final score :', score)
+		if   score == 0:  print('Congratulations !! :)')
+		elif score <= 10: print('Nice one ! :)')
+		elif score <= 20: print('Not bad ! :)')
+		elif score <= 30: print('Meh :(')
 		exit(0)
 
 	def get_card(self):
+		read = input('card: ')
+		if 	read == '':
+			return 'exit'
 		try:
-			read = input('card: ')
+			read = int(read)
 		except:
 			return 'merde'
-		if   read == '':
-			return 'exit'
-		elif read == 0:
+		if   read == 0:
 			return 'restore'
 		elif read not in self.hand or read > 99 or read < 2:
 			return 'merde'
@@ -60,11 +66,12 @@ class TheGame:
 			return read
 
 	def get_stack(self):
+		read = input('stack: ')
 		try:
-			read = input('stack: ')
+			read = int(read)
 		except:
 			return 'merde'
-		if not isinstance(read, int) or read < 1 or read > 4:
+		if read < 1 or read > 4:
 			return 'merde'
 		else:
 			return read
