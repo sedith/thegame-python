@@ -33,6 +33,12 @@ class TheGame:
 		if not self.remain():
 			self.mandatory = 1
 
+	def controls(self):
+		print('Controls :')
+		print('  ENTER  : exit game')
+		print('  0      : restore previous state')
+		print('  2-99   : play card of inputed value')
+
 	def display(self):
 		print('----------------------------------')
 		print(' v   v   ^   ^  ')
@@ -82,7 +88,7 @@ class TheGame:
 
 ### MAIN
 game = TheGame()
-
+game.controls()
 while not game.end():
 	if (game.nb_hand - len(game.hand)) >= game.mandatory:
 		game.draw()
