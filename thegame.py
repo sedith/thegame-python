@@ -2,6 +2,7 @@ from random import shuffle
 from copy import copy
 from bisect import insort
 from math import log10
+from time import sleep
 
 class TheGame:
 	# Initialization
@@ -38,8 +39,10 @@ class TheGame:
 		print('  ENTER     exit game')
 		print('  SPACE     display the lasts cards on each stack')
 		print('  0         restore previous state')
+		print('  1         display list of valid movesa')
 		print('  2-99      play card of inputed value')
-		print('  1-4       play on stack of inputed number')
+		print('Stacks are numbered 1 to 4')
+		print('Enjoy :)')
 	def display(self):
 		print('----------------------------------')
 		print('v',int(log10(self.stacks[0][-1]))*' ',' v',int(log10(self.stacks[1][-1]))*' ',' ʌ',int(log10(self.stacks[2][-1]))*' ',' ʌ', sep='')
@@ -65,10 +68,15 @@ class TheGame:
 			for i in range(nb_show, 0, -1):
 				print(self.stacks[stack][-i], end = ' ')
 			print()
+	def show_valid_moves(self):
+		print('\nList of valid moves :')
+		for c in self.hand:
+			valid = self.check_valid_card(c)
+			if len(valid) > 0: print(c, ':', valid)
 
 	# Inputs
-	def get_card(self):
-		read = input('play card : ')
+	def get_action(self):
+		read = input('action : ')
 		if 	 read == '':
 			return 'exit'
 		if   read == ' ':
@@ -79,13 +87,15 @@ class TheGame:
 			return 'merde'
 		if   read == 0:
 			return 'restore'
+		elif read == 1:
+			return 'help'
 		elif read not in self.hand or read > 99 or read < 2:
-			return 'merde'
+			return 'merde_int'
 		else:
 			return read
 	def get_stack(self):
 		try:
-			read = int(input('on stack  : '))
+			read = int(input('stack  : '))
 		except:
 			return 0
 		if read < 1 or read > 4:
@@ -100,11 +110,22 @@ class TheGame:
 			return prev_card > card or prev_card+10 == card
 		else:
 			return prev_card < card or prev_card-10 == card
+	def check_valid_card(self, card):
+		valid = []
+		for s in range(1,5):
+			if self.is_valid(card, s): valid.append(s)
+		return valid
+	def check_stuck(self):
+		nb_valid_moves = 0
+		for c in self.hand:
+			nb_valid_moves += len(self.check_valid_card(c))
+		if nb_valid_moves == 0: self.score()
 	def draw(self):
 		self.hand.sort()
 		while self.remain() and len(self.hand) < self.nb_hand:
 			self.hand.append(self.deck.pop())
 	def play(self,card,stack):
+		print('\nYou played card ', card, ' on stack ', stack,'.', sep='')
 		self.stacks[stack-1].append(card)
 		self.hand.remove(card)
 
@@ -115,18 +136,22 @@ while not game.end():
 	if game.remain and len(game.hand) <= game.nb_hand-2:
 		game.draw()
 	game.display()
-	card = game.get_card()
-	if   card == 'merde':
-		continue
-	elif card == 'exit':
-		break
-	elif card == 'restore':
-		game.restore()
-	elif card == 'expand':
-		game.show_stacks()
+	game.check_stuck()
+	card = game.get_action()
+	if   card == 'merde':		print('\nInvalid action.') ; continue
+	elif card == 'merde_int':	print('\nInvalid card number.') ; continue
+	elif card == 'exit':		break
+	elif card == 'help':		game.show_valid_moves()
+	elif card == 'restore': 	game.restore()
+	elif card == 'expand':  	game.show_stacks()
 	else:
-		stack = game.get_stack()
-		if stack and game.is_valid(card, stack):
+		valid_moves = game.check_valid_card(card)
+		if   len(valid_moves) == 0:	print('\nYou cannot play this card.') ; continue
+		elif len(valid_moves) == 1: stack = valid_moves[0]
+		else:						stack = game.get_stack()
+		if stack in valid_moves:
 			game.backup(stack)
 			game.play(card,stack)
+		else:
+			print('\nYou cannot play this card here.')
 game.score()
