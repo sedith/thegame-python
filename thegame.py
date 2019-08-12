@@ -94,6 +94,12 @@ class TheGame:
 			return read
 
 	# Game
+	def is_valid(self, card, stack):
+		prev_card = self.stacks[stack-1][-1]
+		if stack < 3:
+			return prev_card > card or prev_card+10 == card
+		else:
+			return prev_card < card or prev_card-10 == card
 	def draw(self):
 		self.hand.sort()
 		while self.remain() and len(self.hand) < self.nb_hand:
@@ -120,7 +126,7 @@ while not game.end():
 		game.show_stacks()
 	else:
 		stack = game.get_stack()
-		if stack:
+		if stack and game.is_valid(card, stack):
 			game.backup(stack)
 			game.play(card,stack)
 game.score()
