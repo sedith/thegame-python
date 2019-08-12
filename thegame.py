@@ -12,24 +12,30 @@ class TheGame:
 		self.draw()
 		self.hand.sort()
 		self.stacks = [100, 100, 1, 1]
-		self.backup()
+		self.history = []
 
 	def remain(self): return len(self.deck) > 0
 	def end(self): return len(self.hand) == 0
 
 	def backup(self):
-		self.old_stacks = copy(self.stacks)
-		self.old_hand = copy(self.hand)
-		self.old_deck = copy(self.deck)
+		self.history.append({'stacks': copy(self.stacks), 'hand': copy(self.hand), 'deck': copy(self.deck)})
+		# self.old_stacks = copy(self.stacks)
+		# self.old_hand = copy(self.hand)
+		# self.old_deck = copy(self.deck)
 	def restore(self):
-		self.deck = self.old_deck
-		self.hand = self.old_hand
-		self.stacks = self.old_stacks
+		# self.deck = self.old_deck
+		# self.hand = self.old_hand
+		# self.stacks = self.old_stacks
+		if len(self.history) > 0 :
+			self.deck = self.history[-1]['deck']
+			self.hand = self.history[-1]['hand']
+			self.stacks = self.history[-1]['stacks']
+			self.history.pop()
 
 	def draw(self):
 		self.hand.sort()
 		while self.remain() and len(self.hand) < self.nb_hand:
-			self.hand += [self.deck.pop()]
+			self.hand.append(self.deck.pop())
 		if not self.remain():
 			self.mandatory = 1
 
