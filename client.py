@@ -1,5 +1,4 @@
 import zmq
-import json
 from math import log10
 
 
@@ -11,24 +10,24 @@ class GameBoard:
         self.pseudo = pseudo
 
     def display(self):
-        print('')
+        print()
         print('----------------------------------')
         print(
             'v',
-            int(log10(self.board[0])) * ' ',
+            ' ' * int(log10(self.board[0])),
             ' v',
-            int(log10(self.board[1])) * ' ',
+            ' ' * int(log10(self.board[1])),
             ' ʌ',
-            int(log10(self.board[2])) * ' ',
+            ' ' * int(log10(self.board[2])),
             ' ʌ',
             sep='',
         )
         print(
             self.board[0], self.board[1], self.board[2], self.board[3],
         )
-        print('')
-        for i in range(len(self.hand)):
-            print(self.hand[i], end=' ')
+        print()
+        for card in self.hand:
+            print(card, end=' ')
         print('\n')
 
     def end(score):
@@ -38,7 +37,7 @@ class GameBoard:
             print('Congratulations!! :D')
         else:
             print('Maybe next time ;)')
-        exit(0)
+        exit()
 
 
 ### MAIN
@@ -66,7 +65,7 @@ if __name__ == '__main__':
     while True:
         tokens = input('action : ').split()
         socket.send_json(
-            {'pseudo': table.pseudo, 'method': tokens[0], 'args': tokens[1:] or []}
+            {'pseudo': table.pseudo, 'method': tokens[0], 'args': tokens[1:]}
         )
         resp = socket.recv_json()
         if resp['status'] == 'error':

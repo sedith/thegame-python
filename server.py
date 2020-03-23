@@ -1,7 +1,5 @@
 import zmq
-import json
 from random import shuffle
-from time import sleep
 
 
 class Player:
@@ -25,7 +23,7 @@ class TheGame:
     active = -1
 
     def __init__(self):
-        self.deck = [i for i in range(2, 100)]
+        self.deck = list(range(2, 100))
         shuffle(self.deck)
         self.stacks = [[100], [100], [1], [1]]
 
@@ -42,10 +40,7 @@ class TheGame:
             return 6
 
     def n_to_play(self):
-        if self.remain():
-            return 2
-        else:
-            return 1
+        return 2 if self.remain() else 1
 
     def n_card_played(self):
         return self.nb_cards() - len(self.active().hand)
@@ -66,10 +61,7 @@ class TheGame:
         return len(self.deck) > 0
 
     def finished(self):
-        finished = not self.remain()
-        for p in players:
-            finished = finished and not p.hand
-        return finished
+        return not self.remain() and not any(p.hand for p in self.players)
 
     # Checks
     def check_player(self, pseudo):
@@ -82,7 +74,7 @@ class TheGame:
         return card in self.get_active().hand
 
     def check_stack(self, stack):
-        return stack >= 0 and stack < 4
+        return 0 <= stack < 4
 
     def check_started(self):
         return self.active != -1
@@ -142,10 +134,7 @@ class TheGame:
         return self.get_active().pseudo
 
     def score(self):
-        score = len(self.deck())
-        for p in self.players:
-            score += len(p.hand)
-        return score
+        return sum(len(p.hand) for p in self.players) + len(self.deck())
 
 
 class API:
