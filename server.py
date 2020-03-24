@@ -4,10 +4,16 @@ from random import shuffle
 
 class Player:
     hand = []
+    order = -1
 
     def __init__(self, pseudo):
         self.pseudo = pseudo
 
+    def set_order(self, order):
+        self.order = order
+
+    def get_order(self):
+        return self.order
 
 class Move:
     def __init__(self, pseudo, card, stack):
@@ -20,7 +26,7 @@ class TheGame:
     # Initialization
     players = []
     history = []
-    active = -1
+    phase = 'registration'
 
     def __init__(self):
         self.deck = list(range(2, 100))
@@ -31,66 +37,47 @@ class TheGame:
     def get_board(self):
         return [s[-1] for s in self.stacks]
 
-    def nb_cards(self):
-        if len(self.players) == 1:
-            return 8
-        elif len(self.players) == 2:
-            return 7
-        else:
-            return 6
+    def get_deck(self):
+        return len(self.deck)
 
-    def n_to_play(self):
-        return 2 if self.remain() else 1
-
-    def n_card_played(self):
-        return self.nb_cards() - len(self.active().hand)
+    def get_score(self):
+        return sum(len(p.hand) for p in self.players) + len(self.deck())
 
     def get_active(self):
-        return self.players[self.active]
-
-    def find_player(self, pseudo):
-        return self.get_pseudos().index(pseudo)
+        return self.players[[p.order for p in self.players].index(self.active)]
 
     def get_player(self, pseudo):
-        return self.players[self.find_player(pseudo)]
+        return self.players[[p.pseudo for p in self.players].index(pseudo)]
 
-    def get_pseudos(self):
-        return [p.pseudo for p in self.players]
-
+    # Checks
     def remain(self):
         return len(self.deck) > 0
 
-    def finished(self):
-        return not self.remain() and not any(p.hand for p in self.players)
-
-    # Checks
     def check_player(self, pseudo):
-        return pseudo in self.get_pseudos()
-
-    def check_active(self, pseudo):
-        return pseudo == self.get_active().pseudo
-
-    def check_card(self, card):
-        return card in self.get_active().hand
+        return pseudo in [p.pseudo for p in self.players]
 
     def check_stack(self, stack):
         return 0 <= stack < 4
 
-    def check_started(self):
-        return self.active != -1
+    def check_card(self, card):
+        return card in self.get_active().hand
 
-    def check_playable(self, move):
+    def check_move(self, move):
         prev_card = self.stacks[move.stack][-1]
         if move.stack < 2:
             return prev_card > move.card or prev_card + 10 == move.card
         else:
             return prev_card < move.card or prev_card - 10 == move.card
 
+    def check_finished(self):
+        return not self.remain() and not any(p.hand for p in self.players)
+
     def check_stuck(self):
-        struck = self.n_card_played() < self.n_to_play()
+        n = 2 if self.remain() else 1
+        struck = self.nb_cards - len(self.get_active().hand) < n
         for c in self.get_active().hand:
             for s in range(1, 5):
-                if self.check_playable(Move('', c, s)):
+                if self.check_move(Move('', c, s)):
                     struck = False
                     break
         return stuck
@@ -99,92 +86,114 @@ class TheGame:
     def register(self, pseudo):
         self.players.append(Player(pseudo))
 
+    def close_registrations(self):
+        if self.phase == 'registration':
+            self.phase = 'preparation'
+            if len(self.players) == 1:
+                self.nb_cards = 8
+            elif len(self.players) == 2:
+                self.nb_cards = 7
+            else:
+                self.nb_cards = 6
+
     # History
     def restore(self):
         last_move = self.history.pop()
         self.get_active().hand.append(self.stacks[last_move.stack].pop())
 
     # Game
-    def start(self, pseudo):
-        for p in self.get_pseudos():
-            self.draw(p)
-            self.get_player(p).hand.sort()
-        self.active = self.find_player(pseudo)
+    def player_ready(self, pseudo, order):
+        if not 0 < order <= len(self.players) or order in [p.order for p in self.players]:
+            return False
+        self.get_player(pseudo).set_order(order)
+        if all(p.order != -1 for p in self.players):
+            self.start()
+
+    def start(self):
+        self.phase = 'play'
+        self.active = 0
 
     def draw(self, pseudo):
-        print(pseudo)
+        # hand is fully sorted during the preparation phase
+        # otherwise, existing cards are sorted and the rest is appended
         p = self.get_player(pseudo)
-        print(p.hand)
-        print(self.remain())
         p.hand.sort()
-        n = self.nb_cards()
-        while self.remain() and len(p.hand) < n:
+        while self.remain() and len(p.hand) < self.nb_cards:
             p.hand.append(self.deck.pop())
+        if self.phase == 'preparation':
+            p.hand.sort()
+        else
+            self.end_turn
         return p.hand
 
     def play(self, move):
         self.get_active().hand.remove(move.card)
         self.stacks[move.stack].append(move.card)
         self.history.append(move)
-        return self.get_active().hand
+        if self.check_stuck() or self.check_finished():
+            self.phase = 'end'
 
     def end_turn(self):
         self.draw(self.get_active().pseudo)
         self.active = (self.active + 1) % len(self.players)
-        return self.get_active().pseudo
-
-    def score(self):
-        return sum(len(p.hand) for p in self.players) + len(self.deck())
 
 
 class API:
     '''
     ALLOWED ACTIONS
-    * connect(pseudo)
-    * start
-    * controls
-    * play(card,stack)
-    * draw
-    #    * who
-    #    * expand(stack)
-    #    * undo
-    #    * valid_moves
+    * registration
+        * connect(pseudo)
+        * draw
+    * preparation
+        * draw
+        * order
+    * play
+        * play(card,stack)
+        * draw
+        # who
+        # expand(stack)
+        # undo
+        # valid_moves
     '''
 
     game = TheGame()
 
+    def notify(self):
+        if self.game.phase == 'play':
+            return {'status':'play', 'board':self.game.get_board(), 'deck':self.game.get_deck(), 'player':self.game.get_active().pseudo}
+        if self.game.phase == 'end':
+            return {'status':'end', 'score':self.game.get_score()}
+
     def call(self, pseudo, method, args):
+        # return getattr(self, method)(pseudo=pseudo, *args)
         try:
             return getattr(self, method)(pseudo=pseudo, *args)
         except:
             return {'status': 'error', 'value': 'invalid request'}
 
     def connect(self, *args, pseudo, **kwargs):
-        if self.game.check_started():
+        if self.game.phase != 'registration':
             return {'status': 'error', 'value': 'game already started'}
         if self.game.check_player(pseudo):
-            return {'status': 'error', 'value': 'player already registered'}
-        else:
-            self.game.register(pseudo)
-            return {'status': 'ok', 'value': self.controls()['value']}
+            return {'status': 'error', 'value': 'name %s already taken' % pseudo}
+        self.game.register(pseudo)
+        return {'status': 'ok', 'value': ''}
 
-    def start(self, pseudo, *args, **kwargs):
-        if self.game.check_started():
-            return {'status': 'error', 'value': 'game already started'}
-        if not self.game.check_player(pseudo):
-            return {'status': 'error', 'value': 'player not registered'}
-        else:
-            self.game.start(pseudo)
-            return {
-                'status': 'ok',
-                'value': (self.game.get_active().hand, self.game.get_board()),
-            }
-
-    def controls(self, *args, **kwargs):
+    def draw(self, *args, pseudo, **kwargs):
+        self.game.close_registrations()
         return {
             'status': 'ok',
-            'value': 'controls, start, play(card[2-98],stack[1-4]), draw',
+            'value': self.game.draw(pseudo)
         }
+
+    def order(self, order, *args, pseudo, **kwargs):
+        if self.game.phase == 'registration':
+            return {'status': 'error', 'value': 'draw before defining order'}
+        if self.game.phase == 'play':
+            return {'status': 'error', 'value': 'game already started'}
+        if not self.game.player_ready(pseudo,order):
+            return {'status': 'error', 'value': 'invalid order'}
+        return {'status': 'ok', 'value': ''}
 
     def play(self, card, stack, *args, pseudo, **kwargs):
         try:
@@ -193,34 +202,19 @@ class API:
         except:
             return {
                 'status': 'error',
-                'value': 'invalid arguement for method play (format is "play card stack", card and stack are integers)',
+                'value': 'invalid argument, format is "play card stack"',
             }
-        if not self.game.check_started():
+        if self.game.phase != 'play':
             return {'status': 'error', 'value': 'game not started'}
-        if not self.game.check_player(pseudo):
-            return {'status': 'error', 'value': 'player not registered'}
-        if not self.game.check_active(pseudo):
-            return {'status': 'error', 'value': 'player not active'}
+        if not self.game.check_stack(stack - 1):
+            return {'status': 'error', 'value': 'invalid stack number ([1-4])'}
         if not self.game.check_card(card):
             return {'status': 'error', 'value': 'card %i not in hand' % card}
-        if not self.game.check_stack(stack - 1):
-            return {'status': 'error', 'value': 'invalid stack %i' % stack}
         move = Move(pseudo, card, stack - 1)
-        if not self.game.check_playable(move):
-            return {'status': 'error', 'value': 'card not playable'}
-        return {'status': 'ok', 'value': (self.game.play(move), self.game.get_board())}
-
-    def draw(self, *args, pseudo, **kwargs):
-        if not self.game.check_started():
-            return {'status': 'error', 'value': 'game not started'}
-        if not self.game.check_player(pseudo):
-            return {'status': 'error', 'value': 'player not registered'}
-        if not self.game.check_active(pseudo):
-            return {'status': 'error', 'value': 'player not active'}
-        return {
-            'status': 'ok',
-            'value': (self.game.draw(pseudo), self.game.get_board()),
-        }
+        if not self.game.check_move(move):
+            return {'status': 'error', 'value': 'card %i not playable on stack %i' % (card, stack)}
+        self.game.play(move)
+        return {'status': 'ok', 'value': self.game.get_active().hand}
 
 
 ### MAIN
@@ -228,14 +222,21 @@ if __name__ == '__main__':
     api = API()
 
     context = zmq.Context()
-    socket = context.socket(zmq.REP)
-    socket.bind('tcp://*:5555')
+    rep_socket = context.socket(zmq.REP)
+    rep_socket.bind('tcp://*:5555')
+    pub_socket = context.socket(zmq.PUB)
+    pub_socket.bind("tcp://*:5556")
 
     print('Game started')
 
     while True:
-        req = socket.recv_json()
-        print('Got request:  %s' % req)
+        req = rep_socket.recv_json()
+        print('Receive request:  %s' % req)
         resp = api.call(**req)
-        socket.send_json(resp)
-        print('Sending response: %s\n' % resp)
+        rep_socket.send_json(resp)
+        print('Send response: %s' % resp)
+        notif = api.notify()
+        if notif is not None:
+            pub_socket.send_json(notif)
+            print('Notify: %s' % notif)
+        print()

@@ -4,12 +4,13 @@ from math import log10
 
 class GameBoard:
     board = []
+    deck_size = ''
     hand = []
 
     def __init__(self, pseudo):
-        self.pseudo = pseudo
+        self.you = pseudo
 
-    def display(self):
+    def display_board(self):
         print()
         print('----------------------------------')
         print(
@@ -26,18 +27,19 @@ class GameBoard:
             self.board[0], self.board[1], self.board[2], self.board[3],
         )
         print()
+
+    def display_hand(self):
         for card in self.hand:
             print(card, end=' ')
-        print('\n')
+        print()
 
-    def end(score):
+    def display_score(score):
         print('----------------------------------')
         print('Final score :', score)
         if score == 0:
             print('Congratulations!! :D')
         else:
             print('Maybe next time ;)')
-        exit()
 
 
 ### MAIN
@@ -45,32 +47,61 @@ if __name__ == '__main__':
     print('Welcome to ConoraTheGame ^o^')
 
     context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect('tcp://localhost:5555')
+    req_socket = context.socket(zmq.REQ)
+    req_socket.connect('tcp://localhost:5555')
+    sub_socket = context.socket(zmq.SUB)
+    sub_socket.connect("tcp://localhost:5556")
 
-    table = GameBoard(input('Whats your name? '))
 
     # Registration
-    socket.send_json({'method': 'connect', 'pseudo': table.pseudo, 'args': []})
-    resp = socket.recv_json()
-    if resp['status'] == 'error':
-        print('Oops. %s' % resp['value'])
-        exit(1)
-    else:
-        print('You are in The Game!')
-        print('Possible actions are : %s' % resp['value'])
-        print('Input format: [action] [arg1] [arg2]')
-        print('')
-
     while True:
-        tokens = input('action : ').split()
-        socket.send_json(
-            {'pseudo': table.pseudo, 'method': tokens[0], 'args': tokens[1:]}
-        )
-        resp = socket.recv_json()
+        table = GameBoard(input('What\'s your name? '))
+        req_socket.send_json({'method': 'connect', 'pseudo': table.you, 'args': []})
+        resp = req_socket.recv_json()
         if resp['status'] == 'error':
             print('Oops, %s' % resp['value'])
-        elif tokens[0] in ['play', 'draw', 'start']:
-            table.hand = resp['value'][0]
-            table.board = resp['value'][1]
-            table.display()
+        else:
+            print('You are in The Game!')
+            break
+
+    # Preparation
+    print(press)
+    print('Ok, here\' your hand:')
+    table.display_hand()
+    while True:
+        prompt = 'In which order would you like to play? '
+        req_socket.send_json({'method': 'order', 'pseudo': table.you, 'args': [input(prompt)]})
+        resp = req_socket.recv_json()
+        if resp['status'] == 'error':
+            print('Oops, %s' % resp['value'])
+        else:
+            print('Got it.')
+            break
+
+    # Actual game
+    while True:
+        # Wait for notification
+        notif = sub_socket.recv_json()
+
+        # Update table
+        if notif['status'] == end:
+            table.display_score()
+            exit()
+        table.board = notif['board']
+        table.deck = notif['deck']
+        table.display_board()
+        table.display_hand()
+
+        # Check for your turn
+        if notif['player'] == table.you:
+            tokens = input('action : ').split()
+            req_socket.send_json(
+                {'pseudo': table.you, 'method': tokens[0], 'args': tokens[1:]}
+            )
+            resp = req_socket.recv_json()
+            if resp['status'] == 'error':
+                print('Oops, %s' % resp['value'])
+            elif tokens[0] in ['play', 'draw']:
+                table.hand = resp['value']
+        else:
+            print('Waiting for %s to play' % notif['player'])
