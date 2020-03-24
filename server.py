@@ -1,13 +1,13 @@
 import zmq
 from random import shuffle
+from time import sleep
 
 
 class Player:
-    hand = []
-    order = -1
-
     def __init__(self, pseudo):
         self.pseudo = pseudo
+        self.hand = []
+        self.order = -1
 
     def set_order(self, order):
         self.order = order
@@ -74,11 +74,11 @@ class TheGame:
 
     def check_stuck(self):
         n = 2 if self.remain() else 1
-        struck = self.nb_cards - len(self.get_active().hand) < n
+        stuck = self.nb_cards - len(self.get_active().hand) < n
         for c in self.get_active().hand:
             for s in range(1, 5):
                 if self.check_move(Move('', c, s)):
-                    struck = False
+                    stuck = False
                     break
         return stuck
 
@@ -105,25 +105,39 @@ class TheGame:
     def player_ready(self, pseudo, order):
         if not 0 < order <= len(self.players) or order in [p.order for p in self.players]:
             return False
-        self.get_player(pseudo).set_order(order)
+        self.get_player(pseudo).set_order(order-1)
         if all(p.order != -1 for p in self.players):
             self.start()
+        return True
 
     def start(self):
         self.phase = 'play'
         self.active = 0
 
+    def first_draw(self,pseudo):
+        for p in self.players:
+            print(p.pseudo, p.hand)
+        self.close_registrations()
+        p = self.get_player(pseudo)
+        if len(p.hand) == self.nb_cards:
+            print('??')
+            return []
+        while self.remain() and len(p.hand) < self.nb_cards:
+            p.hand.append(self.deck.pop())
+        p.hand.sort()
+        return p.hand
+
     def draw(self, pseudo):
-        # hand is fully sorted during the preparation phase
-        # otherwise, existing cards are sorted and the rest is appended
+        # existing cards are sorted and the rest is appended
+        n = 2 if self.remain() else 1
+        p = self.get_player(pseudo)
+        if self.nb_cards - len(p.hand) < n:
+            return []
         p = self.get_player(pseudo)
         p.hand.sort()
         while self.remain() and len(p.hand) < self.nb_cards:
             p.hand.append(self.deck.pop())
-        if self.phase == 'preparation':
-            p.hand.sort()
-        else
-            self.end_turn
+        self.end_turn
         return p.hand
 
     def play(self, move):
@@ -165,11 +179,10 @@ class API:
             return {'status':'end', 'score':self.game.get_score()}
 
     def call(self, pseudo, method, args):
-        # return getattr(self, method)(pseudo=pseudo, *args)
         try:
             return getattr(self, method)(pseudo=pseudo, *args)
-        except:
-            return {'status': 'error', 'value': 'invalid request'}
+        except Exception as e:
+            return {'status': 'error', 'value': 'caught exception: %s' % str(e)}
 
     def connect(self, *args, pseudo, **kwargs):
         if self.game.phase != 'registration':
@@ -180,18 +193,22 @@ class API:
         return {'status': 'ok', 'value': ''}
 
     def draw(self, *args, pseudo, **kwargs):
-        self.game.close_registrations()
-        return {
-            'status': 'ok',
-            'value': self.game.draw(pseudo)
-        }
+        if self.game.phase != 'play':
+            print('%s draws' %  pseudo)
+            h = self.game.first_draw(pseudo)
+        else:
+            h = self.game.draw(pseudo)
+        if not h:
+            return {'status': 'error', 'value': '%s cannot draw now' % pseudo}
+        return {'status': 'ok', 'value': h}
 
     def order(self, order, *args, pseudo, **kwargs):
+        # in theory, we cannot enter the first if due to client design
         if self.game.phase == 'registration':
             return {'status': 'error', 'value': 'draw before defining order'}
         if self.game.phase == 'play':
             return {'status': 'error', 'value': 'game already started'}
-        if not self.game.player_ready(pseudo,order):
+        if not self.game.player_ready(pseudo,int(order)):
             return {'status': 'error', 'value': 'invalid order'}
         return {'status': 'ok', 'value': ''}
 
@@ -237,6 +254,7 @@ if __name__ == '__main__':
         print('Send response: %s' % resp)
         notif = api.notify()
         if notif is not None:
+            sleep(1)
             pub_socket.send_json(notif)
             print('Notify: %s' % notif)
         print()

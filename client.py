@@ -1,5 +1,6 @@
 import zmq
 from math import log10
+from time import sleep
 
 
 class GameBoard:
@@ -21,10 +22,12 @@ class GameBoard:
             ' ʌ',
             ' ' * int(log10(self.board[2])),
             ' ʌ',
+            ' ' * int(log10(self.board[3])),
+            '    deck',
             sep='',
         )
         print(
-            self.board[0], self.board[1], self.board[2], self.board[3],
+            self.board[0], self.board[1], self.board[2], self.board[3],'    ', self.deck_size
         )
         print()
 
@@ -51,7 +54,7 @@ if __name__ == '__main__':
     req_socket.connect('tcp://localhost:5555')
     sub_socket = context.socket(zmq.SUB)
     sub_socket.connect("tcp://localhost:5556")
-
+    sub_socket.setsockopt_string(zmq.SUBSCRIBE, '{')
 
     # Registration
     while True:
@@ -65,8 +68,9 @@ if __name__ == '__main__':
             break
 
     # Preparation
-    print(press)
-    print('Ok, here\' your hand:')
+    req_socket.send_json({'method': 'draw', 'pseudo': table.you, 'args': [input('Press any key when every players are connected.')]})
+    table.hand = req_socket.recv_json()['value'] # this call should never fail
+    print('Ok, here\'s your hand:')
     table.display_hand()
     while True:
         prompt = 'In which order would you like to play? '
@@ -84,11 +88,11 @@ if __name__ == '__main__':
         notif = sub_socket.recv_json()
 
         # Update table
-        if notif['status'] == end:
+        if notif['status'] == 'end':
             table.display_score()
             exit()
         table.board = notif['board']
-        table.deck = notif['deck']
+        table.deck_size = notif['deck']
         table.display_board()
         table.display_hand()
 
