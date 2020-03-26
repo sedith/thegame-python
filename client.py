@@ -64,23 +64,29 @@ if __name__ == '__main__':
         if resp['status'] == 'error':
             print('Oops, %s' % resp['value'])
         else:
-            print('You are in The Game!')
             break
 
-    # Preparation
-    req_socket.send_json({'method': 'draw', 'pseudo': table.you, 'args': [input('Press any key when every players are connected.')]})
-    table.hand = req_socket.recv_json()['value'] # this call should never fail
-    print('Ok, here\'s your hand:')
-    table.display_hand()
-    while True:
-        prompt = 'In which order would you like to play? '
-        req_socket.send_json({'method': 'order', 'pseudo': table.you, 'args': [input(prompt)]})
-        resp = req_socket.recv_json()
-        if resp['status'] == 'error':
-            print('Oops, %s' % resp['value'])
-        else:
-            print('Got it.')
-            break
+    if resp['value'] == '':
+        print('You are in The Game!')
+        # Preparation
+        req_socket.send_json({'method': 'draw', 'pseudo': table.you, 'args': [input('Press any key when every players are connected.')]})
+        table.hand = req_socket.recv_json()['value'] # this call should never fail
+        print('Ok, here\'s your hand:')
+        table.display_hand()
+        while True:
+            prompt = 'In which order would you like to play? '
+            req_socket.send_json({'method': 'order', 'pseudo': table.you, 'args': [input(prompt)]})
+            resp = req_socket.recv_json()
+            if resp['status'] == 'error':
+                print('Oops, %s' % resp['value'])
+            else:
+                print('Got it.')
+                break
+    else:
+        print('Welcome back %s' % table.you)
+        table.hand = resp['value']['hand']
+        table.board = resp['value']['board']
+        table.deck_size = resp['value']['deck']
 
     # Actual game
     while True:
@@ -98,7 +104,9 @@ if __name__ == '__main__':
 
         # Check for your turn
         if notif['player'] == table.you:
-            tokens = input('action : ').split()
+            tokens = []
+            while tokens == []:
+                tokens = input('action : ').split()
             req_socket.send_json(
                 {'pseudo': table.you, 'method': tokens[0], 'args': tokens[1:]}
             )

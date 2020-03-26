@@ -1,6 +1,5 @@
 import zmq
 from random import shuffle
-from time import sleep
 
 
 class Player:
@@ -44,10 +43,16 @@ class TheGame:
         return sum(len(p.hand) for p in self.players) + len(self.deck())
 
     def get_active(self):
-        return self.players[[p.order for p in self.players].index(self.active)]
+        try:
+            return self.players[[p.order for p in self.players].index(self.active)]
+        except ValueError:
+            return None
 
     def get_player(self, pseudo):
-        return self.players[[p.pseudo for p in self.players].index(pseudo)]
+        try:
+            return self.players[[p.pseudo for p in self.players].index(pseudo)]
+        except ValueError:  # pseudo not in players
+            return None
 
     # Checks
     def remain(self):
@@ -103,12 +108,9 @@ class TheGame:
 
     # Game
     def player_ready(self, pseudo, order):
-        if not 0 < order <= len(self.players) or order in [p.order for p in self.players]:
-            return False
         self.get_player(pseudo).set_order(order-1)
         if all(p.order != -1 for p in self.players):
             self.start()
-        return True
 
     def start(self):
         self.phase = 'play'
@@ -137,7 +139,7 @@ class TheGame:
         p.hand.sort()
         while self.remain() and len(p.hand) < self.nb_cards:
             p.hand.append(self.deck.pop())
-        self.end_turn
+        self.end_turn()
         return p.hand
 
     def play(self, move):
@@ -185,12 +187,15 @@ class API:
             return {'status': 'error', 'value': 'caught exception: %s' % str(e)}
 
     def connect(self, *args, pseudo, **kwargs):
-        if self.game.phase != 'registration':
-            return {'status': 'error', 'value': 'game already started'}
+        if self.game.phase == 'registration':
+            if self.game.check_player(pseudo):
+                return {'status': 'of', 'value': 'name %s already taken' % pseudo}
+            self.game.register(pseudo)
+            return {'status': 'ok', 'value': ''}
         if self.game.check_player(pseudo):
-            return {'status': 'error', 'value': 'name %s already taken' % pseudo}
-        self.game.register(pseudo)
-        return {'status': 'ok', 'value': ''}
+            return {'status': 'of', 'value': {'hand': self.game.get_player(pseudo).hand, 'board': self.game.get_board(), 'deck':self.game.get_deck()}}
+        return {'status': 'error', 'value': 'game already started'}
+
 
     def draw(self, *args, pseudo, **kwargs):
         if self.game.phase != 'play':
@@ -203,20 +208,35 @@ class API:
         return {'status': 'ok', 'value': h}
 
     def order(self, order, *args, pseudo, **kwargs):
+        try:
+            order = int(order)
+            assert 0 < order <= len(self.game.players) and order - 1 not in [p.order for p in self.game.players]
+        except ValueError:
+            return {
+                'status': 'error',
+                'value': 'invalid argument, enter integer value'
+            }
+        except AssertionError:
+            l = [p.order + 1 for p in self.game.players if p.order != -1]
+            append_value = ', these are already taken: %s' % l if l != [] else ''
+            return {
+                'status': 'error',
+                'value': 'correct order is between 1 and %i%s' % (len(self.game.players), ', these are already taken: %s' % l if l != [] else '')
+            }
+
         # in theory, we cannot enter the first if due to client design
         if self.game.phase == 'registration':
             return {'status': 'error', 'value': 'draw before defining order'}
         if self.game.phase == 'play':
             return {'status': 'error', 'value': 'game already started'}
-        if not self.game.player_ready(pseudo,int(order)):
-            return {'status': 'error', 'value': 'invalid order'}
+        self.game.player_ready(pseudo,order)
         return {'status': 'ok', 'value': ''}
 
     def play(self, card, stack, *args, pseudo, **kwargs):
         try:
             card = int(card)
             stack = int(stack)
-        except:
+        except ValueError:
             return {
                 'status': 'error',
                 'value': 'invalid argument, format is "play card stack"',
@@ -254,7 +274,6 @@ if __name__ == '__main__':
         print('Send response: %s' % resp)
         notif = api.notify()
         if notif is not None:
-            sleep(1)
             pub_socket.send_json(notif)
             print('Notify: %s' % notif)
         print()
