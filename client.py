@@ -1,6 +1,5 @@
 import zmq
 from math import log10
-from time import sleep
 
 
 class GameBoard:
@@ -27,7 +26,12 @@ class GameBoard:
             sep='',
         )
         print(
-            self.board[0], self.board[1], self.board[2], self.board[3],'    ', self.deck_size
+            self.board[0],
+            self.board[1],
+            self.board[2],
+            self.board[3],
+            '    ',
+            self.deck_size,
         )
         print()
 
@@ -59,7 +63,9 @@ if __name__ == '__main__':
     # Registration
     while True:
         table = GameBoard(input('What\'s your name? '))
-        req_socket.send_json({'method': 'connect', 'pseudo': table.you, 'args': []})
+        req_socket.send_json(
+            {'method': 'connect', 'pseudo': table.you, 'args': []}
+        )
         resp = req_socket.recv_json()
         if resp['status'] == 'error':
             print('Oops, %s' % resp['value'])
@@ -69,13 +75,29 @@ if __name__ == '__main__':
     if resp['value'] == '':
         print('You are in The Game!')
         # Preparation
-        req_socket.send_json({'method': 'draw', 'pseudo': table.you, 'args': [input('Press any key when every players are connected.')]})
-        table.hand = req_socket.recv_json()['value'] # this call should never fail
+        req_socket.send_json(
+            {
+                'method': 'draw',
+                'pseudo': table.you,
+                'args': [
+                    input('Press any key when every players are connected.')
+                ],
+            }
+        )
+        table.hand = req_socket.recv_json()[
+            'value'
+        ]  # this call should never fail
         print('Ok, here\'s your hand:')
         table.display_hand()
         while True:
             prompt = 'In which order would you like to play? '
-            req_socket.send_json({'method': 'order', 'pseudo': table.you, 'args': [input(prompt)]})
+            req_socket.send_json(
+                {
+                    'method': 'order',
+                    'pseudo': table.you,
+                    'args': [input(prompt)],
+                }
+            )
             resp = req_socket.recv_json()
             if resp['status'] == 'error':
                 print('Oops, %s' % resp['value'])

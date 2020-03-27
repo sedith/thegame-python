@@ -14,6 +14,7 @@ class Player:
     def get_order(self):
         return self.order
 
+
 class Move:
     def __init__(self, pseudo, card, stack):
         self.pseudo = pseudo
@@ -44,7 +45,9 @@ class TheGame:
 
     def get_active(self):
         try:
-            return self.players[[p.order for p in self.players].index(self.active)]
+            return self.players[
+                [p.order for p in self.players].index(self.active)
+            ]
         except ValueError:
             return None
 
@@ -81,7 +84,7 @@ class TheGame:
         n = 2 if self.remain() else 1
         stuck = self.nb_cards - len(self.get_active().hand) < n
         for c in self.get_active().hand:
-            for s in range(1, 5):
+            for s in range(0, 4):
                 if self.check_move(Move('', c, s)):
                     stuck = False
                     break
@@ -108,7 +111,7 @@ class TheGame:
 
     # Game
     def player_ready(self, pseudo, order):
-        self.get_player(pseudo).set_order(order-1)
+        self.get_player(pseudo).set_order(order - 1)
         if all(p.order != -1 for p in self.players):
             self.start()
 
@@ -116,7 +119,7 @@ class TheGame:
         self.phase = 'play'
         self.active = 0
 
-    def first_draw(self,pseudo):
+    def first_draw(self, pseudo):
         for p in self.players:
             print(p.pseudo, p.hand)
         self.close_registrations()
@@ -154,6 +157,8 @@ class TheGame:
         while empty:
             self.active = (self.active + 1) % len(self.players)
             empty = self.get_active().hand == []
+        if self.check_stuck():
+            self.phase = 'end'
 
 
 class API:
@@ -178,9 +183,14 @@ class API:
 
     def notify(self):
         if self.game.phase == 'play':
-            return {'status':'play', 'board':self.game.get_board(), 'deck':self.game.get_deck(), 'player':self.game.get_active().pseudo}
+            return {
+                'status': 'play',
+                'board': self.game.get_board(),
+                'deck': self.game.get_deck(),
+                'player': self.game.get_active().pseudo,
+            }
         if self.game.phase == 'end':
-            return {'status':'end', 'score':self.game.get_score()}
+            return {'status': 'end', 'score': self.game.get_score()}
 
     def call(self, pseudo, method, args):
         try:
@@ -191,17 +201,26 @@ class API:
     def connect(self, *args, pseudo, **kwargs):
         if self.game.phase == 'registration':
             if self.game.check_player(pseudo):
-                return {'status': 'of', 'value': 'name %s already taken' % pseudo}
+                return {
+                    'status': 'of',
+                    'value': 'name %s already taken' % pseudo,
+                }
             self.game.register(pseudo)
             return {'status': 'ok', 'value': ''}
         if self.game.check_player(pseudo):
-            return {'status': 'of', 'value': {'hand': self.game.get_player(pseudo).hand, 'board': self.game.get_board(), 'deck':self.game.get_deck()}}
+            return {
+                'status': 'of',
+                'value': {
+                    'hand': self.game.get_player(pseudo).hand,
+                    'board': self.game.get_board(),
+                    'deck': self.game.get_deck(),
+                },
+            }
         return {'status': 'error', 'value': 'game already started'}
-
 
     def draw(self, *args, pseudo, **kwargs):
         if self.game.phase != 'play':
-            print('%s draws' %  pseudo)
+            print('%s draws' % pseudo)
             h = self.game.first_draw(pseudo)
         else:
             h = self.game.draw(pseudo)
@@ -212,18 +231,26 @@ class API:
     def order(self, order, *args, pseudo, **kwargs):
         try:
             order = int(order)
-            assert 0 < order <= len(self.game.players) and order - 1 not in [p.order for p in self.game.players]
+            assert 0 < order <= len(self.game.players) and order - 1 not in [
+                p.order for p in self.game.players
+            ]
         except ValueError:
             return {
                 'status': 'error',
-                'value': 'invalid argument, enter integer value'
+                'value': 'invalid argument, enter integer value',
             }
         except AssertionError:
             l = [p.order + 1 for p in self.game.players if p.order != -1]
-            append_value = ', these are already taken: %s' % l if l != [] else ''
+            append_value = (
+                ', these are already taken: %s' % l if l != [] else ''
+            )
             return {
                 'status': 'error',
-                'value': 'correct order is between 1 and %i%s' % (len(self.game.players), ', these are already taken: %s' % l if l != [] else '')
+                'value': 'correct order is between 1 and %i%s'
+                % (
+                    len(self.game.players),
+                    ', these are already taken: %s' % l if l != [] else '',
+                ),
             }
 
         # in theory, we cannot enter the first if due to client design
@@ -231,7 +258,7 @@ class API:
             return {'status': 'error', 'value': 'draw before defining order'}
         if self.game.phase == 'play':
             return {'status': 'error', 'value': 'game already started'}
-        self.game.player_ready(pseudo,order)
+        self.game.player_ready(pseudo, order)
         return {'status': 'ok', 'value': ''}
 
     def play(self, card, stack, *args, pseudo, **kwargs):
@@ -251,7 +278,10 @@ class API:
             return {'status': 'error', 'value': 'card %i not in hand' % card}
         move = Move(pseudo, card, stack - 1)
         if not self.game.check_move(move):
-            return {'status': 'error', 'value': 'card %i not playable on stack %i' % (card, stack)}
+            return {
+                'status': 'error',
+                'value': 'card %i not playable on stack %i' % (card, stack),
+            }
         self.game.play(move)
         return {'status': 'ok', 'value': self.game.get_active().hand}
 
