@@ -40,7 +40,7 @@ class TheGame:
         return len(self.deck)
 
     def get_score(self):
-        return sum(len(p.hand) for p in self.players) + len(self.deck())
+        return sum(len(p.hand) for p in self.players) + len(self.deck)
 
     def get_active(self):
         try:

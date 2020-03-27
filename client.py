@@ -36,7 +36,7 @@ class GameBoard:
             print(card, end=' ')
         print()
 
-    def display_score(score):
+    def display_score(self, score):
         print('----------------------------------')
         print('Final score :', score)
         if score == 0:
@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
         # Update table
         if notif['status'] == 'end':
-            table.display_score()
+            table.display_score(notif['score'])
             exit()
         table.board = notif['board']
         table.deck_size = notif['deck']
