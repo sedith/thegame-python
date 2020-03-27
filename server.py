@@ -150,8 +150,10 @@ class TheGame:
             self.phase = 'end'
 
     def end_turn(self):
-        self.draw(self.get_active().pseudo)
-        self.active = (self.active + 1) % len(self.players)
+        empty = True
+        while empty:
+            self.active = (self.active + 1) % len(self.players)
+            empty = self.get_active().hand == []
 
 
 class API:
