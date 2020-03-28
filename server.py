@@ -45,9 +45,7 @@ class TheGame:
 
     def get_active(self):
         try:
-            return self.players[
-                [p.order for p in self.players].index(self.active)
-            ]
+            return self.players[[p.order for p in self.players].index(self.active)]
         except ValueError:
             return None
 
@@ -202,14 +200,14 @@ class API:
         if self.game.phase == 'registration':
             if self.game.check_player(pseudo):
                 return {
-                    'status': 'of',
+                    'status': 'error',
                     'value': 'name %s already taken' % pseudo,
                 }
             self.game.register(pseudo)
             return {'status': 'ok', 'value': ''}
         if self.game.check_player(pseudo):
             return {
-                'status': 'of',
+                'status': 'ok',
                 'value': {
                     'hand': self.game.get_player(pseudo).hand,
                     'board': self.game.get_board(),
@@ -241,9 +239,7 @@ class API:
             }
         except AssertionError:
             l = [p.order + 1 for p in self.game.players if p.order != -1]
-            append_value = (
-                ', these are already taken: %s' % l if l != [] else ''
-            )
+            append_value = ', these are already taken: %s' % l if l != [] else ''
             return {
                 'status': 'error',
                 'value': 'correct order is between 1 and %i%s'
